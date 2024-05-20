@@ -6,6 +6,7 @@ from json.decoder import JSONDecodeError
 # import urllib.request
 # from werkzeug.utils import secure_filename
 from flask_cors import CORS
+from PIL import Image
 
 
 from codeGen import CodeGen
@@ -22,7 +23,7 @@ messages = [{"role": "system", "content": "You are an expert in web development"
 
 
 
-ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
+
 
 # Function to generate completion using OpenAI Chat API
 def get_completion(prompt, model="ft:gpt-3.5-turbo-0125:personal::91vUW2df"):
@@ -96,6 +97,16 @@ def get_completion2(prompt, model="ft:gpt-3.5-turbo-0125:personal::95dWvD91"):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+
+
+
+def convert_to_png(input_image_path, output_image_path):
+    with Image.open(input_image_path) as img:
+        output_image_path = os.path.splitext(output_image_path)[0] + '.png'
+        img.save(output_image_path, 'PNG')
+    return output_image_path
+
 # Route to the homepage
 @app.route('/')
 def main():
@@ -104,8 +115,6 @@ def main():
 # Route to handle file upload
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    # open('fullCode.json', 'w').close()
-    # check if the post request has the file part
     if 'file' not in request.files:
         resp = jsonify({
             "message": 'No file part in the request',
@@ -117,13 +126,18 @@ def upload_file():
     file = request.files['file']
 
     if file and allowed_file(file.filename):
-        file.save('Uimage.png')
-        im = os.path.abspath('Uimage.png')
-        img_file = CodeGen(im)
+        temp_path = 'temp_image'
+        file.save(temp_path)
+        png_path = convert_to_png(temp_path, 'Uimage.png')
+
+        # Assuming CodeGen is a class you have defined elsewhere
+        img_file = CodeGen(png_path)
         img_file.generateCode()
-        # file.save('Uimage.png')
+
+        os.remove(temp_path)  # Clean up the temporary file if desired
+
         resp = jsonify({
-            "message": 'File successfully uploaded',
+            "message": 'File successfully uploaded and converted to PNG',
             "status": 'success'
         })
         resp.status_code = 201
@@ -135,7 +149,6 @@ def upload_file():
         })
         resp.status_code = 400
         return resp
-
 # Function to load data from a JSON file
 def run():
     f = open('fullCode.json')
